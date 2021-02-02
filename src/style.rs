@@ -4,7 +4,8 @@
 //! etc.
 
 use std::default::Default;
-use term::{self, Terminal};
+use std::io;
+use termcolor::{ColorSpec, WriteColor};
 
 #[derive(Copy, Clone, Default, PartialEq, Eq)]
 pub struct Style {
@@ -93,96 +94,115 @@ impl Style {
     /// Attempts to apply the given style to the given terminal. If
     /// the style is not supported, either there is no effect or else
     /// a similar, substitute style may be applied.
-    pub fn apply<T: Terminal + ?Sized>(self, term: &mut T) -> term::Result<()> {
+    pub fn apply<T: io::Write + WriteColor + ?Sized>(self, term: &mut T) -> io::Result<()> {
         term.reset()?;
 
+        let mut spec = ColorSpec::new();
+
         macro_rules! fg_color {
+            ($color:expr, $term_color:ident, bright) => {
+                if self.contains($color) {
+                    if term.supports_color() {
+                        spec.set_fg(Some(termcolor::Color::$term_color))
+                            .set_intense(true);
+                    }
+                }
+            };
             ($color:expr, $term_color:ident) => {
                 if self.contains($color) {
                     if term.supports_color() {
-                        term.fg(term::color::$term_color)?;
+                        spec.set_fg(Some(termcolor::Color::$term_color));
                     }
                 }
             };
         }
 
-        fg_color!(FG_BLACK, BLACK);
-        fg_color!(FG_BLUE, BLUE);
-        fg_color!(FG_BRIGHT_BLACK, BRIGHT_BLACK);
-        fg_color!(FG_BRIGHT_BLUE, BRIGHT_BLUE);
-        fg_color!(FG_BRIGHT_CYAN, BRIGHT_CYAN);
-        fg_color!(FG_BRIGHT_GREEN, BRIGHT_GREEN);
-        fg_color!(FG_BRIGHT_MAGENTA, BRIGHT_MAGENTA);
-        fg_color!(FG_BRIGHT_RED, BRIGHT_RED);
-        fg_color!(FG_BRIGHT_WHITE, BRIGHT_WHITE);
-        fg_color!(FG_BRIGHT_YELLOW, BRIGHT_YELLOW);
-        fg_color!(FG_CYAN, CYAN);
-        fg_color!(FG_GREEN, GREEN);
-        fg_color!(FG_MAGENTA, MAGENTA);
-        fg_color!(FG_RED, RED);
-        fg_color!(FG_WHITE, WHITE);
-        fg_color!(FG_YELLOW, YELLOW);
+        fg_color!(FG_BLACK, Black);
+        fg_color!(FG_BLUE, Blue);
+        fg_color!(FG_BRIGHT_BLACK, Black, bright);
+        fg_color!(FG_BRIGHT_BLUE, Blue, bright);
+        fg_color!(FG_BRIGHT_CYAN, Cyan, bright);
+        fg_color!(FG_BRIGHT_GREEN, Green, bright);
+        fg_color!(FG_BRIGHT_MAGENTA, Magenta, bright);
+        fg_color!(FG_BRIGHT_RED, Red, bright);
+        fg_color!(FG_BRIGHT_WHITE, White, bright);
+        fg_color!(FG_BRIGHT_YELLOW, Yellow, bright);
+        fg_color!(FG_CYAN, Cyan);
+        fg_color!(FG_GREEN, Green);
+        fg_color!(FG_MAGENTA, Magenta);
+        fg_color!(FG_RED, Red);
+        fg_color!(FG_WHITE, White);
+        fg_color!(FG_YELLOW, Yellow);
 
         macro_rules! bg_color {
+            ($color:expr, $term_color:ident, bright) => {
+                if self.contains($color) {
+                    if term.supports_color() {
+                        spec.set_bg(Some(termcolor::Color::$term_color))
+                            .set_intense(true);
+                    }
+                }
+            };
             ($color:expr, $term_color:ident) => {
                 if self.contains($color) {
                     if term.supports_color() {
-                        term.bg(term::color::$term_color)?;
+                        spec.set_bg(Some(termcolor::Color::$term_color));
                     }
                 }
             };
         }
 
-        bg_color!(BG_BLACK, BLACK);
-        bg_color!(BG_BLUE, BLUE);
-        bg_color!(BG_BRIGHT_BLACK, BRIGHT_BLACK);
-        bg_color!(BG_BRIGHT_BLUE, BRIGHT_BLUE);
-        bg_color!(BG_BRIGHT_CYAN, BRIGHT_CYAN);
-        bg_color!(BG_BRIGHT_GREEN, BRIGHT_GREEN);
-        bg_color!(BG_BRIGHT_MAGENTA, BRIGHT_MAGENTA);
-        bg_color!(BG_BRIGHT_RED, BRIGHT_RED);
-        bg_color!(BG_BRIGHT_WHITE, BRIGHT_WHITE);
-        bg_color!(BG_BRIGHT_YELLOW, BRIGHT_YELLOW);
-        bg_color!(BG_CYAN, CYAN);
-        bg_color!(BG_GREEN, GREEN);
-        bg_color!(BG_MAGENTA, MAGENTA);
-        bg_color!(BG_RED, RED);
-        bg_color!(BG_WHITE, WHITE);
-        bg_color!(BG_YELLOW, YELLOW);
+        bg_color!(BG_BLACK, Black);
+        bg_color!(BG_BLUE, Blue);
+        bg_color!(BG_BRIGHT_BLACK, Black, bright);
+        bg_color!(BG_BRIGHT_BLUE, Blue, bright);
+        bg_color!(BG_BRIGHT_CYAN, Cyan, bright);
+        bg_color!(BG_BRIGHT_GREEN, Green, bright);
+        bg_color!(BG_BRIGHT_MAGENTA, Magenta, bright);
+        bg_color!(BG_BRIGHT_RED, Red, bright);
+        bg_color!(BG_BRIGHT_WHITE, White, bright);
+        bg_color!(BG_BRIGHT_YELLOW, Yellow, bright);
+        bg_color!(BG_CYAN, Cyan);
+        bg_color!(BG_GREEN, Green);
+        bg_color!(BG_MAGENTA, Magenta);
+        bg_color!(BG_RED, Red);
+        bg_color!(BG_WHITE, White);
+        bg_color!(BG_YELLOW, Yellow);
 
         macro_rules! attr {
-            ($attr:expr, $term_attr:expr) => {
+            ($attr:expr, $builder_fn:ident) => {
                 if self.contains($attr) {
-                    let attr = $term_attr;
-                    if term.supports_attr(attr) {
-                        term.attr(attr)?;
-                    }
+                    spec.$builder_fn(true);
                 }
             };
         }
 
-        attr!(BOLD, term::Attr::Bold);
-        attr!(DIM, term::Attr::Dim);
-        attr!(ITALIC, term::Attr::Italic(true));
-        attr!(UNDERLINE, term::Attr::Underline(true));
-        attr!(BLINK, term::Attr::Blink);
-        attr!(STANDOUT, term::Attr::Standout(true));
-        attr!(REVERSE, term::Attr::Reverse);
-        attr!(SECURE, term::Attr::Secure);
+        attr!(BOLD, set_bold);
+        attr!(DIM, set_dimmed);
+        attr!(ITALIC, set_italic);
+        attr!(UNDERLINE, set_underline);
 
-        Ok(())
+        // TODO FIXME in order to fully migrate to termcolor without breaking
+        // support for existing code, we'll need to implement these attributes
+        //
+        // attr!(REVERSE);
+        // attr!(SECURE);
+        // attr!(STANDOUT);
+        // attr!(BLINK);
+
+        term.set_color(&spec)
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////
 
-pub struct StyleCursor<'term, T: ?Sized + Terminal> {
+pub struct StyleCursor<'term, T: ?Sized + io::Write + WriteColor> {
     current_style: Style,
     term: &'term mut T,
 }
 
-impl<'term, T: ?Sized + Terminal> StyleCursor<'term, T> {
-    pub fn new(term: &'term mut T) -> term::Result<StyleCursor<'term, T>> {
+impl<'term, T: ?Sized + io::Write + WriteColor> StyleCursor<'term, T> {
+    pub fn new(term: &'term mut T) -> io::Result<StyleCursor<'term, T>> {
         let current_style = Style::default();
         current_style.apply(term)?;
         Ok(StyleCursor {
@@ -195,7 +215,7 @@ impl<'term, T: ?Sized + Terminal> StyleCursor<'term, T> {
         self.term
     }
 
-    pub fn set_style(&mut self, style: Style) -> term::Result<()> {
+    pub fn set_style(&mut self, style: Style) -> io::Result<()> {
         if style != self.current_style {
             style.apply(self.term)?;
             self.current_style = style;

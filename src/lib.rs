@@ -4,9 +4,10 @@
 
 use crate::style::Style;
 use std::cmp;
+use std::io;
 use std::iter::ExactSizeIterator;
 use std::ops::Range;
-use term::Terminal;
+use termcolor::WriteColor;
 
 mod row;
 #[cfg(test)]
@@ -142,7 +143,7 @@ impl AsciiCanvas {
         self.in_range_index(r, self.columns)
     }
 
-    pub fn write_to<T: Terminal + ?Sized>(&self, term: &mut T) -> term::Result<()> {
+    pub fn write_to<T: io::Write + WriteColor + ?Sized>(&self, term: &mut T) -> io::Result<()> {
         for row in self.to_strings() {
             row.write_to(term)?;
             writeln!(term, "")?;
